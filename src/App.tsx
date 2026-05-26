@@ -74,7 +74,17 @@ export default function App() {
   const [showSettings, setShowSettings] = useState(true);
 
   const [backendUrl, setBackendUrl] = useState<string>(() => {
-    return localStorage.getItem("vocalassist_backend_url") || "";
+    const saved = localStorage.getItem("vocalassist_backend_url");
+    if (saved !== null) {
+      return saved;
+    }
+    // Auto-detect Netlify / Vercel / external hosting & set to active Cloud Run server URL
+    const hostname = window.location.hostname;
+    const isCloudRun = hostname.includes("-429842933088.europe-west2.run.app");
+    if (!isCloudRun) {
+      return "https://ais-pre-rgz2jlhoc37bn4dhktpwbc-429842933088.europe-west2.run.app";
+    }
+    return "";
   });
 
   const [showPermissionModal, setShowPermissionModal] = useState(false);
