@@ -198,21 +198,23 @@ export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass, ba
               throw new Error("STATIC_HOST_ERROR: Static page returned. Netlify / Vercel single-page-apps do not run the Node.js backend. Scroll down to Settings and press the 'Auto-Link AI Cloud' button to automatically link with your project's hosted Gemini server!");
             }
 
+            const responseText = await response.text();
+
             if (!response.ok) {
               let errText = "Failed to parse whispers.";
+              if (responseText.includes("<!DOCTYPE") || responseText.includes("<html")) {
+                throw new Error("STATIC_HOST_ERROR: Static page returned. Netlify / Vercel single-page-apps do not run the Node.js backend. Scroll down to Settings and press the 'Auto-Link' button to connect!");
+              }
               try {
-                const errData = await response.json();
+                const errData = JSON.parse(responseText);
                 errText = errData.error || errText;
               } catch (e) {
-                const rawText = await response.text();
-                if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
-                  throw new Error("STATIC_HOST_ERROR: Static page returned. Netlify / Vercel single-page-apps do not run the Node.js backend. Scroll down to Settings and press the 'Auto-Link' button to connect!");
-                }
+                errText = responseText || errText;
               }
               throw new Error(errText);
             }
 
-            const data = await response.json();
+            const data = JSON.parse(responseText);
             if (data.text) {
               // Set the giant visual rendering
               setTranscribedText(data.text);

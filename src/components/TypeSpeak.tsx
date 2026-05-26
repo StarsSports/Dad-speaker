@@ -69,21 +69,23 @@ export default function TypeSpeak({
         throw new Error("STATIC_HOST_ERROR");
       }
 
+      const responseText = await resp.text();
+
       if (!resp.ok) {
         let errText = "Failed to translate";
+        if (responseText.includes("<!DOCTYPE") || responseText.includes("<html")) {
+          throw new Error("STATIC_HOST_ERROR");
+        }
         try {
-          const errData = await resp.json();
+          const errData = JSON.parse(responseText);
           errText = errData.error || errText;
         } catch (e) {
-          const rawText = await resp.text();
-          if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
-            throw new Error("STATIC_HOST_ERROR");
-          }
+          errText = responseText || errText;
         }
         throw new Error(errText);
       }
 
-      const result = await resp.json();
+      const result = JSON.parse(responseText);
       if (result.text) {
         setTypedText(result.text);
       }
