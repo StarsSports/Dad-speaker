@@ -353,12 +353,77 @@ export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass }: 
         </div>
       )}
 
-      {/* Errors displays */}
+      {/* Errors displays with Guided Accessibility Troubleshooter */}
       {errorMessage && (
-        <div className="flex items-start gap-3 p-4 bg-[#FAF2F2] border-2 border-[#EBD5D5] rounded-2xl text-[#A85C5C] text-sm max-w-lg mx-auto font-sans shadow-sm">
-          <AlertTriangle className="w-5 h-5 shrink-0 text-[#A85C5C] mt-0.5" />
-          <div>
-            <span className="font-bold">Notice:</span> {errorMessage}
+        <div className="space-y-4 max-w-lg mx-auto">
+          <div className="flex items-start gap-3 p-4 bg-[#FAF2F2] border-2 border-[#EBD5D5] rounded-2xl text-[#A85C5C] text-sm font-sans shadow-sm">
+            <AlertTriangle className="w-5 h-5 shrink-0 text-[#A85C5C] mt-0.5" />
+            <div>
+              <span className="font-bold">Notice:</span> {errorMessage}
+            </div>
+          </div>
+
+          {/* Localized Empathetic Step-By-Step Advisor */}
+          <div className="bg-[#FAF8F5] border border-[#EBE3D5] rounded-2xl p-5 text-sm space-y-3 shadow-xs text-left" dir={isRtl ? "rtl" : "ltr"}>
+            <h5 className="font-bold font-display text-[#8C7A5C] flex items-center gap-2">
+              <HelpCircle className="w-4 h-4 text-[#8C7A5C]" />
+              {lang === "ar" ? "كيفية حل مشكلة الميكروفون وسماح الإذن:" : lang === "fr" ? "Comment activer l'accès au microphone :" : "How to enable/fix Microphone Access:"}
+            </h5>
+            
+            <ul className="space-y-2.5 text-xs text-[#8C7A5C]/90 list-disc list-inside leading-relaxed pl-1">
+              <li>
+                <strong>{lang === "ar" ? "تنشيط فوري:" : lang === "fr" ? "Refresh instantané :" : "Instant fix:"} </strong>
+                {lang === "ar" ? "اضغط على زر إعادة التحميل أدناه، وعند ظهور النافذة المنبثقة اضغط على 'سماح'." : lang === "fr" ? "Appuyez sur 'Recharger la page' ci-dessous et cliquez sur 'Autoriser'." : "Tap 'Reload Page' below and make sure to select 'Allow/Smahh' on the prompt."}
+              </li>
+
+              {isRtl ? (
+                <>
+                  <li>
+                    <strong>هواتف آيفون (iPhone):</strong> اذهب إلى تطبيق <span className="font-bold">الإعدادات</span> {">"} <span className="font-bold">Safari</span> {">"} وانزل لـ <span className="font-bold">الميكروفون</span> {">"} واختر <span className="font-bold opacity-90">'سماح'</span>.
+                  </li>
+                  <li>
+                    <strong>هواتف أندرويد (Android):</strong> من متصفح Chrome، اضغط على النقاط الثلاث {">"} <span className="font-bold">الإعدادات</span> {">"} <span className="font-bold">إعدادات المواقع</span> {">"} <span className="font-bold">الميكروفون</span> وقم بتفعيله.
+                  </li>
+                  <li>
+                    <strong>استخدام تطبيق خارجي (فيسبوك/إنستغرام):</strong> إذا فتحت الرابط من داخل إنستغرام أو فيسبوك، اضغط على قائمة الثلاث نقاط أعلى الزاوية واشترط <span className="font-bold">'الفتح في متصفح خارجي' (Safari أو Chrome)</span> ليعمل الميكرفون معك بشكل سليم.
+                  </li>
+                </>
+              ) : lang === "fr" ? (
+                <>
+                  <li>
+                    <strong>Sur iPhone / PWA :</strong> Allez dans les <span className="font-bold">Réglages</span> {">"} <span className="font-bold">Safari</span> {">"} défilez vers le bas jusqu'à <span className="font-bold">Microphone</span>, puis sélectionnez <span className="font-bold">'Autoriser'</span>.
+                  </li>
+                  <li>
+                    <strong>Sur Android :</strong> Dans Chrome, appuyez sur les 3 points {">"} <span className="font-bold">Paramètres</span> {">"} <span className="font-bold">Paramètres des sites</span> {">"} <span className="font-bold">Microphone</span>, puis activez l'autorisation pour ce site.
+                  </li>
+                  <li>
+                    <strong>Navigateur In-App (Facebook/Instagram) :</strong> Chuchoter est bloqué par les navigateurs internes. Cliquez sur les options de partage et choisissez <span className="font-bold">'Ouvrir dans Safari/Chrome'</span>.
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <strong>Apple iPhone/iPad:</strong> Open your iOS <span className="font-bold">Settings app</span> {">"} go to <span className="font-bold">Safari</span> {">"} scroll down to <span className="font-bold">Microphone</span> and set it to <span className="font-bold">'Allow'</span> or <span className="font-bold">'Ask'</span>.
+                  </li>
+                  <li>
+                    <strong>Android Mobile:</strong> On your Chrome browser, click the 3 dots in the corner {">"} <span className="font-bold">Settings</span> {">"} <span className="font-bold">Site settings</span> {">"} <span className="font-bold">Microphone</span> and toggle to grant permission.
+                  </li>
+                  <li>
+                    <strong>In-App Browsers:</strong> If you opened this inside Instagram, Messenger, or Facebook context, click the menu button in the corner and choose <span className="font-bold">'Open in Safari/Chrome'</span> to enable system microphone access.
+                  </li>
+                </>
+              )}
+            </ul>
+
+            <div className="pt-2 border-t border-[#EBE3D5]/60 flex justify-end">
+              <button
+                onClick={() => window.location.reload()}
+                className="flex items-center gap-2 px-4 py-2 bg-[#8C7A5C] text-white hover:bg-[#73644A] text-xs font-bold rounded-xl transition-all shadow-xs cursor-pointer active:scale-95"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>{lang === "ar" ? "🔄 إعادة تحميل وتجربة الإذن" : lang === "fr" ? "🔄 Recharger la page" : "🔄 Reload Page & Retry"}</span>
+              </button>
+            </div>
           </div>
         </div>
       )}
