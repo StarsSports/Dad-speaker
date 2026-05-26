@@ -12,6 +12,7 @@ interface TypeSpeakProps {
   textVolume: number;
   setTextVolume: (vol: number) => void;
   fontSizeClass: string;
+  backendUrl?: string;
 }
 
 export default function TypeSpeak({
@@ -23,7 +24,8 @@ export default function TypeSpeak({
   setTextSpeed,
   textVolume,
   setTextVolume,
-  fontSizeClass
+  fontSizeClass,
+  backendUrl
 }: TypeSpeakProps) {
   const dictionary = LOCALIZATION[lang];
   const [typedText, setTypedText] = useState("");
@@ -47,7 +49,11 @@ export default function TypeSpeak({
     setTranslationError("");
 
     try {
-      const resp = await fetch("/api/translate", {
+      const apiEndpoint = backendUrl 
+        ? `${backendUrl.replace(/\/$/, "")}/api/translate` 
+        : "/api/translate";
+
+      const resp = await fetch(apiEndpoint, {
         method: "POST",
         headers: {
           "Content-Type": "application/json"
@@ -58,9 +64,23 @@ export default function TypeSpeak({
         })
       });
 
+      const contentType = resp.headers.get("content-type");
+      if (contentType && contentType.includes("text/html")) {
+        throw new Error("STATIC_HOST_ERROR");
+      }
+
       if (!resp.ok) {
-        const errData = await resp.json();
-        throw new Error(errData.error || "Failed to translate");
+        let errText = "Failed to translate";
+        try {
+          const errData = await resp.json();
+          errText = errData.error || errText;
+        } catch (e) {
+          const rawText = await resp.text();
+          if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
+            throw new Error("STATIC_HOST_ERROR");
+          }
+        }
+        throw new Error(errText);
       }
 
       const result = await resp.json();
@@ -69,7 +89,18 @@ export default function TypeSpeak({
       }
     } catch (err: any) {
       console.error(err);
-      setTranslationError(err.message || "Could not contact translation server.");
+      const msg = err.message || "";
+      if (msg.includes("STATIC_HOST_ERROR") || msg.includes("Unexpected token") || msg.includes("is not valid JSON") || msg.includes("DOCTYPE")) {
+        setTranslationError(
+          lang === "ar"
+            ? "تنبيه: تعذرت الاستعانة بمترجم الذكاء الاصطناعي بسبب استضافة مستقلة (Netlify). اضغط 'ربط تلقائي بالخادم' بالإعدادات بالأسفل لتفعيلها فوراً."
+            : lang === "fr"
+            ? "Traduction indisponible : Hébergement Netlify statique détecté. Liez le serveur backend dans les Paramètres en bas."
+            : "AI Translation is only active on running servers. Tap 'Auto-Connect / Auto-Link' in Settings down below to proxy translations through your active project backend."
+        );
+      } else {
+        setTranslationError(err.message || "Could not contact translation server.");
+      }
     } finally {
       setIsTranslating(false);
     }

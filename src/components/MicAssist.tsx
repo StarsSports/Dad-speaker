@@ -7,9 +7,10 @@ interface MicAssistProps {
   onSpeak: (text: string) => void;
   isSpeaking: boolean;
   fontSizeClass: string;
+  backendUrl?: string;
 }
 
-export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass }: MicAssistProps) {
+export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass, backendUrl }: MicAssistProps) {
   const dictionary = LOCALIZATION[lang];
   const [useAiMode, setUseAiMode] = useState<boolean>(true); // Default to Gemini AI Whisperer (highly accurate for very soft speech)
   const [isRecording, setIsRecording] = useState<boolean>(false);
@@ -176,7 +177,11 @@ export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass }: 
             const base64String = (reader.result as string).split(",")[1];
             
             // Post payload to backend transcription API
-            const response = await fetch("/api/transcribe", {
+            const apiEndpoint = backendUrl 
+              ? `${backendUrl.replace(/\/$/, "")}/api/transcribe` 
+              : "/api/transcribe";
+
+            const response = await fetch(apiEndpoint, {
               method: "POST",
               headers: {
                 "Content-Type": "application/json"
@@ -188,9 +193,23 @@ export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass }: 
               })
             });
 
+            const contentType = response.headers.get("content-type");
+            if (contentType && contentType.includes("text/html")) {
+              throw new Error("STATIC_HOST_ERROR: Static page returned. Netlify / Vercel single-page-apps do not run the Node.js backend. Scroll down to Settings and press the 'Auto-Link AI Cloud' button to automatically link with your project's hosted Gemini server!");
+            }
+
             if (!response.ok) {
-              const errData = await response.json();
-              throw new Error(errData.error || "Failed to parse whispers.");
+              let errText = "Failed to parse whispers.";
+              try {
+                const errData = await response.json();
+                errText = errData.error || errText;
+              } catch (e) {
+                const rawText = await response.text();
+                if (rawText.includes("<!DOCTYPE") || rawText.includes("<html")) {
+                  throw new Error("STATIC_HOST_ERROR: Static page returned. Netlify / Vercel single-page-apps do not run the Node.js backend. Scroll down to Settings and press the 'Auto-Link' button to connect!");
+                }
+              }
+              throw new Error(errText);
             }
 
             const data = await response.json();
@@ -206,8 +225,17 @@ export default function MicAssist({ lang, onSpeak, isSpeaking, fontSizeClass }: 
             }
           } catch (apiErr: any) {
             console.error("Transcribe API error:", apiErr);
-            if (apiErr.message?.includes("GEMINI_API_KEY")) {
+            const msg = apiErr.message || "";
+            if (msg.includes("GEMINI_API_KEY")) {
               setErrorMessage("AI key not configured on our server yet. Please head to Settings > Secrets or check with your developer.");
+            } else if (msg.includes("Unexpected token") || msg.includes("is not valid JSON") || msg.includes("STATIC_HOST_ERROR") || msg.includes("DOCTYPE")) {
+              setErrorMessage(
+                lang === "ar"
+                  ? "تنبيه استضافة مستقلة (مثل Netlify): تم إرجاع صفحة HTML بدلاً من ملف البرمجة. يرجى التمرير لأسفل لـ 'الإعدادات' والضغط على 'ربط تلقائي فوري' ليتمكن هذا الرابط من معالجة صوتك بذكاء."
+                  : lang === "fr"
+                  ? "Erreur d'hébergement Netlify : Page HTML renvoyée. Faites défiler vers le bas pour cliquer sur 'Connexion Auto' dans les paramètres pour rediriger vers votre serveur."
+                  : "Independent hosting detected (Netlify). Please scroll down to Settings and tap 'Auto-Connect' or 'Auto-Link AI Cloud' to securely delegate whisper voices to your project's server."
+              );
             } else {
               setErrorMessage(apiErr.message || "An error occurred while cleaning your voice trace.");
             }

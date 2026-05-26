@@ -11,7 +11,8 @@ import {
   Keyboard,
   Mic,
   Smile,
-  Type
+  Type,
+  Globe
 } from "lucide-react";
 import { speakText, stopSpeaking } from "./speechEngine";
 import { LOCALIZATION, LanguageCode } from "./data";
@@ -19,6 +20,34 @@ import PresetActions from "./components/PresetActions";
 import TypeSpeak from "./components/TypeSpeak";
 import MicAssist from "./components/MicAssist";
 import InfoGuide from "./components/InfoGuide";
+import { RefreshCw } from "lucide-react";
+
+const permissionModalStrings = {
+  en: {
+    title: "🎤 Real Device Microphone Required",
+    desc: "To record your voice and transcribe whispers intelligently, this app requires real device microphone access.",
+    btn: "Activate Mic Access Now",
+    skip: "Continue manually",
+    success: "Permission granted! Enjoy the app.",
+    status: "Prompting device microphone popup..."
+  },
+  ar: {
+    title: "🎤 مطلوب إذن الميكروفون الحقيقي للجهاز",
+    desc: "لتسجيل صوتك وتفسير الهمسات بدقة عالية، يحتاج هذا التطبيق إلى صلاحية الوصول الحقيقية لميكروفون جهازك.",
+    btn: "تفعيل الميكروفون الحقيقي الآن",
+    skip: "المتابعة والإنهاء يدويًا",
+    success: "تم السماح بالإذن بنجاح! استمتع بالتطبيق.",
+    status: "يتم الآن عرض نافذة الهاتف الحقيقية..."
+  },
+  fr: {
+    title: "🎤 Microphone réel de l'appareil requis",
+    desc: "Pour enregistrer votre voix et transcrire les chuchotements intelligemment, cette application nécessite l'accès réel au microphone.",
+    btn: "Activer le micro de l'appareil",
+    skip: "Continuer manuellement",
+    success: "Autorisation accordée ! Profitez de l'application.",
+    status: "Affichage de l'autorisation système..."
+  }
+};
 
 export default function App() {
   // Load initial settings from localStorage if exist to persist preferences
@@ -44,6 +73,47 @@ export default function App() {
   const [isSpeaking, setIsSpeaking] = useState(false);
   const [showSettings, setShowSettings] = useState(true);
 
+  const [backendUrl, setBackendUrl] = useState<string>(() => {
+    return localStorage.getItem("vocalassist_backend_url") || "";
+  });
+
+  const [showPermissionModal, setShowPermissionModal] = useState(false);
+  const [permissionStatus, setPermissionStatus] = useState<"pending" | "granted" | "denied">("pending");
+  const [isRequestingSysPrompt, setIsRequestingSysPrompt] = useState(false);
+
+  // Request actual device microphone on startup
+  useEffect(() => {
+    setShowPermissionModal(true);
+    triggerDeviceMicPrompt(true); // Silent run attempt automatically on start
+  }, []);
+
+  const triggerDeviceMicPrompt = async (silentMode: boolean = false) => {
+    if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+      if (!silentMode) {
+        alert("This browser or device does not support real microphone access. Please use modern Chrome, Safari, or Edge.");
+      }
+      return;
+    }
+
+    try {
+      setIsRequestingSysPrompt(true);
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      // If we got here, permission was granted successfully!
+      setPermissionStatus("granted");
+      setShowPermissionModal(false);
+      // Release stream resource immediately
+      stream.getTracks().forEach(track => track.stop());
+    } catch (err) {
+      console.warn("Real mic prompt failed:", err);
+      setPermissionStatus("denied");
+      if (!silentMode) {
+        setShowPermissionModal(true);
+      }
+    } finally {
+      setIsRequestingSysPrompt(false);
+    }
+  };
+
   // Sync preferences to localStorage
   useEffect(() => {
     localStorage.setItem("vocalassist_lang", lang);
@@ -60,6 +130,10 @@ export default function App() {
   useEffect(() => {
     localStorage.setItem("vocalassist_text_volume", textVolume.toString());
   }, [textVolume]);
+
+  useEffect(() => {
+    localStorage.setItem("vocalassist_backend_url", backendUrl);
+  }, [backendUrl]);
 
   const dictionary = LOCALIZATION[lang];
 
@@ -99,6 +173,33 @@ export default function App() {
       dir={isRtl ? "rtl" : "ltr"}
     >
       <div className="max-w-4xl mx-auto space-y-8">
+        
+        {/* Netlify/Local Proxy Detect Helper */}
+        {(!backendUrl && (window.location.hostname.includes("netlify.app") || window.location.hostname.includes("github.io") || window.location.hostname.includes("localhost"))) && (
+          <div className="bg-amber-50 border-2 border-amber-200 p-4 rounded-3xl text-sm text-amber-900 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-xs animate-fade-in/40 font-sans" dir={isRtl ? "rtl" : "ltr"}>
+            <div className="space-y-1 text-left">
+              <p className="font-bold flex items-center gap-1.5">
+                <span>⚠️</span>
+                <span>{lang === "ar" ? "تم الكشف عن استضافة مستقلة (مثل Netlify)" : lang === "fr" ? "Hébergement Netlify détecté" : "Independent Hosting Detected"}</span>
+              </p>
+              <p className="text-amber-800 text-xs">
+                {lang === "ar" 
+                  ? "تحتاج ميزة ميكروفون الذكاء الاصطناعي (Gemini) والترجمة لخادم متصل فعال لترجمة الكلام بذكاء. اضغط على الزر لربطه فوراً بخادم المشروع السحابي." 
+                  : lang === "fr" 
+                  ? "L'IA nécessite un serveur actif. Cliquez sur le bouton pour l'associer au serveur de votre projet." 
+                  : "AI features require an active Node.js server. Click to auto-connect to this project's Cloud Run backend server."}
+              </p>
+            </div>
+            <button
+              onClick={() => {
+                setBackendUrl("https://ais-pre-rgz2jlhoc37bn4dhktpwbc-429842933088.europe-west2.run.app");
+              }}
+              className="px-4 py-2 bg-[#8C7A5C] hover:bg-[#73644A] text-white rounded-xl font-bold text-xs shadow-xs transition-colors cursor-pointer shrink-0"
+            >
+              ⚡ {lang === "ar" ? "ربط تلقائي فوري" : lang === "fr" ? "Lier le Backend IA" : "Auto-Link AI Cloud"}
+            </button>
+          </div>
+        )}
         
         {/* TOP LEVEL HEADER PLATFORM */}
         <header className="flex flex-col md:flex-row md:items-center justify-between gap-6 bg-white p-6 sm:p-8 rounded-3xl border border-[#E6E6DA] shadow-xs">
@@ -218,6 +319,7 @@ export default function App() {
               textVolume={textVolume}
               setTextVolume={setTextVolume}
               fontSizeClass={getFontSizeClass()}
+              backendUrl={backendUrl}
             />
           )}
 
@@ -227,6 +329,7 @@ export default function App() {
               onSpeak={speak}
               isSpeaking={isSpeaking}
               fontSizeClass={getFontSizeClass()}
+              backendUrl={backendUrl}
             />
           )}
         </main>
@@ -279,6 +382,51 @@ export default function App() {
                 </div>
               </div>
 
+              {/* Backend API Server Configuration for Netlify/External Hosting */}
+              <div id="vocalassist_settings" className="space-y-3 pt-5 border-t border-[#F0F0E6] text-left">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5" dir={isRtl ? "rtl" : "ltr"}>
+                  <label className="text-xs sm:text-sm font-bold text-[#4A4A35] flex items-center gap-2">
+                    <Globe className="w-4 h-4 text-[#5A5A40]" />
+                    <span>{lang === "ar" ? "رابط خادم الذكاء الاصطناعي (مستخدمي Netlify):" : lang === "fr" ? "Serveur API IA (Hébergement externe) :" : "AI Backend Server URL (for Netlify/External) :"}</span>
+                  </label>
+                  {backendUrl !== "https://ais-pre-rgz2jlhoc37bn4dhktpwbc-429842933088.europe-west2.run.app" && (
+                    <button
+                      onClick={() => setBackendUrl("https://ais-pre-rgz2jlhoc37bn4dhktpwbc-429842933088.europe-west2.run.app")}
+                      className="text-[10px] sm:text-xs font-bold text-amber-700 bg-amber-50 hover:bg-amber-100 px-2.5 py-1 rounded-lg border border-amber-200 transition-all cursor-pointer inline-flex items-center gap-1 active:scale-95"
+                    >
+                      ✨ {lang === "ar" ? "ربط تلقائي بالخادم" : lang === "fr" ? "Connexion Auto" : "Auto-Connect to Cloud"}
+                    </button>
+                  )}
+                </div>
+                
+                <div className="relative">
+                  <input
+                    type="url"
+                    value={backendUrl}
+                    onChange={(e) => setBackendUrl(e.target.value)}
+                    placeholder="E.g., https://vocal-assist-api.run.app (Optional - Defaults to hosting provider api)"
+                    className="w-full px-4 py-3 bg-white border border-[#D6D6C2] rounded-xl text-xs sm:text-sm text-[#4A4A35] shadow-xs focus:outline-none focus:ring-2 focus:ring-[#5A5A40]"
+                    dir="ltr"
+                  />
+                  {backendUrl && (
+                    <button
+                      onClick={() => setBackendUrl("")}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-bold text-rose-500 hover:text-rose-700 bg-rose-50 hover:bg-rose-100 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer"
+                    >
+                      {lang === "ar" ? "إلغاء الربط" : lang === "fr" ? "Réinitialiser" : "Reset"}
+                    </button>
+                  )}
+                </div>
+                
+                <p className="text-[11px] text-[#8C8C70] leading-relaxed" dir={isRtl ? "rtl" : "ltr"}>
+                  {lang === "ar" 
+                    ? "إذا رفعت موقعك على Netlify بشكل مستقل، اترك الرابط فارغاً للاستخدام المحلي أو انقر فوق 'ربط تلقائي فوري' ليرتبط موقعك Netlify بخادم السحابي المعين للمشروع ليتولّى معالجة الصوت بذكاء وبثقة." 
+                    : lang === "fr" 
+                    ? "Si vous hébergez de manière autonome sur Netlify, laissez vide pour l'API locale ou cliquez au-dessus sur 'Connexion Auto'." 
+                    : "If deploying securely on Netlify, leave empty for local routes or click 'Auto-Connect' to delegate audio processes directly to this app's secure Cloud Run instance."}
+                </p>
+              </div>
+
               {/* Instant Status Speaks Interrupter Overlay */}
               {isSpeaking && (
                 <div className={`flex items-center justify-between bg-[#EBEBE0]/50 border border-[#D6D6C2] p-4 rounded-xl ${
@@ -304,6 +452,66 @@ export default function App() {
         <InfoGuide lang={lang} />
 
       </div>
+
+      {/* SYSTEM DEVICE MICROPHONE DELEGATOR PROMPT MODAL */}
+      {showPermissionModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-fade-in">
+          <div 
+            className="bg-white rounded-3xl p-6 sm:p-8 max-w-md w-full border border-[#D6D6C2] shadow-2xl space-y-6 text-center animate-scale-up"
+            dir={isRtl ? "rtl" : "ltr"}
+          >
+            <div className="mx-auto w-16 h-16 rounded-full bg-[#EBEBE0] flex items-center justify-center text-[#5A5A40]">
+              <Mic className="w-8 h-8 animate-bounce" />
+            </div>
+            
+            <div className="space-y-2">
+              <h3 className="text-xl sm:text-2xl font-black font-display text-[#5A5A40]">
+                {permissionModalStrings[lang].title}
+              </h3>
+              <p className="text-sm text-[#8C8C70] leading-relaxed font-sans">
+                {permissionModalStrings[lang].desc}
+              </p>
+            </div>
+
+            {permissionStatus === "denied" && (
+              <div className="p-3 bg-red-50 border border-red-200 rounded-xl text-xs text-red-700 space-y-1 text-left" dir={isRtl ? "rtl" : "ltr"}>
+                <p className="font-bold">
+                  {lang === "ar" ? "⚠️ لم نتمكن من تفعيل الميكروفون تلقائياً" : lang === "fr" ? "⚠️ Accès microphone automatique bloqué" : "⚠️ Auto device request did not activate"}
+                </p>
+                <p>
+                  {lang === "ar" 
+                    ? "يرجى النقر فوق زر التفعيل الملون بالأسفل لفتح نافذة الهاتف الأصلية يدوياً، أو تأكد من إعدادات المتصفح لجهازك الحقيقي." 
+                    : lang === "fr" 
+                    ? "Veuillez cliquer sur le bouton ci-dessous pour forcer l'autorisation de votre navigateur ou de votre application." 
+                    : "Please tap the main button below to force trigger your device device authorized prompt."}
+                </p>
+              </div>
+            )}
+
+            <div className="flex flex-col gap-2.5 pt-2">
+              <button
+                onClick={() => triggerDeviceMicPrompt(false)}
+                disabled={isRequestingSysPrompt}
+                className="w-full py-4 bg-[#5A5A40] hover:bg-[#3F3F2C] text-white font-bold rounded-2xl shadow-md hover:shadow-lg transition-all active:scale-95 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+              >
+                {isRequestingSysPrompt ? (
+                  <RefreshCw className="w-5 h-5 animate-spin" />
+                ) : (
+                  <Sparkles className="w-5 h-5" />
+                )}
+                <span>{isRequestingSysPrompt ? permissionModalStrings[lang].status : permissionModalStrings[lang].btn}</span>
+              </button>
+              
+              <button
+                onClick={() => setShowPermissionModal(false)}
+                className="w-full py-2.5 bg-transparent hover:bg-[#F5F5F0] text-[#8C8C70] hover:text-[#5A5A40] font-semibold rounded-xl text-xs sm:text-sm transition-all cursor-pointer"
+              >
+                {permissionModalStrings[lang].skip}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
