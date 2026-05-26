@@ -1,0 +1,6 @@
+{
+  "name": "Voice Assist & Speaker",
+  "description": "An accessible speech assistant for individuals who speak softly. Supports English, Arabic, and French with live voice-to-text, Gemini AI audio correction, and instant text-to-speech playback.",
+  "requestFramePermissions": ["microphone"],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
